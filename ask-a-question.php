@@ -1,19 +1,14 @@
 <?php
 /*
 Plugin Name: Ask A Question
-Plugin URI: http://www.bradjasper.com/projects/ask-a-question/
+Plugin URI: http://github.com/bradjasper/wp-ask-a-question
 Description: Ask A Question - Allow users to ask questions with a simple AJAX form. Simply add <strong>bjaq_form()</strong> anywhere you want the form to appear.
 Author: Brad Jasper
-Version: .1b
+Version: 0.2
 Author URI: http://www.bradjasper.com
 */
 
-ini_set("error_reporting", E_ALL);
-
-if (!isset($wpdb)) {
-//	require('../../wp-blog-header.php');
-	bjaq_init();
-}
+// ini_set("error_reporting", E_ALL);
 
 //	Let's define a few errors we're going to use throughout the script
 $aErrors = array(
@@ -139,43 +134,32 @@ function bjaq_admin_head() {
 			}
 		</style>
 
-		<script language='javascript' type='text/javascript'>
+		<script type='text/javascript'>
 		
 			function bjaq_disable_question(question_id) {
 
-				var url		= '" . $sScriptURI . "';
-				var params	= 'bjaq_admin_ajax=true'
-							  + '&bjaq_question_id=' + question_id;
-				var request = url + '?' + params;
+                var params = '?bjaq_action=bjaq_ajax_disable&bjaq_question_id=' + question_id;
 
-				
-				new Ajax.Request(request,
-					{
-						method:'get',
-						onSuccess: function(transport){
-								bjaq_admin_checkRequest(transport)
-						},
-						onFailure: function(){ bjaq_admin_reportError() }
-					}
-				);
+                jQuery.ajax({
+                    type: 'POST',
+                    url: '" . get_bloginfo("url") . "/'+params,
+                    success: function(data) {
+
+                        if (data == 'success') {
+                            jQuery('#bjaq-id-'+question_id).hide();
+                        } else {
+                            bjaq_admin_reportError();
+                        }
+                    },
+                    error: function(data) {
+                        bjaq_admin_reportError();
+                    }
+                });
 			}
 
-			function bjaq_admin_checkRequest(transport) {
-				var data = transport.responseText.evalJSON()
-
-				if (data.result == 'success') {
-
-					fadeTableRow('bjaq-id-' + data.category_id);
-
-				} else {
-					bjaq_admin_reportError();
-				}
-			}
 			function bjaq_admin_reportError() {
-				alert('failed');
+				alert('An error occured');
 			}
-
-
 		</script>
 	");
 }
@@ -211,21 +195,18 @@ function bjaq_flood_check() {
 	$nAllowed	= 3;
 
 	//	Let's check if they're flooding the form
-	$result = mysql_query("SELECT COUNT(id) as num_submits FROM "
+	$num = $wpdb->get_var($wpdb->prepare("SELECT COUNT(id) as num_submits FROM "
 					. $wpdb->bjaq_questions . " WHERE submitted > (NOW() - 60)"
-					. " AND ip = '" . $sIp . "'");
+					. " AND ip = %s", $sIp));
 
-	$kRow	= mysql_fetch_array($result);
-
-
-	return ($kRow['num_submits'] >= $nAllowed);
+	return ($num >= $nAllowed);
 	
 }
 
 function bjaq_insert_question() {
 	global $wpdb;
 
-	$sQuestion	= mysql_real_escape_string(get_request_var("bjaq_message"));
+	$sQuestion	= htmlspecialchars(mysql_real_escape_string(get_request_var("bjaq_message")));
 
     if (!$sQuestion) {
         return false;
@@ -234,14 +215,9 @@ function bjaq_insert_question() {
 	$sIp		= $_SERVER['REMOTE_ADDR'];
 	$sHost		= gethostbyaddr($sIp);
 
-	$result = mysql_query("INSERT INTO " . $wpdb->bjaq_questions . "
-					(submitted, question, ip, host, status) VALUES
-					(NOW(),
-					'" . $sQuestion . "',
-					'" . $sIp . "',
-					'" . $sHost . "',
-					1)"
-	);
+    $result = $wpdb->query($wpdb->prepare( "INSERT INTO " . $wpdb->bjaq_questions 
+        . " (submitted, question, ip, host, status) VALUES (NOW(), '%s', '%s', '%s', 1)",
+            $sQuestion, $sIp, $sHost));
 
 	return $result;
 }
@@ -249,34 +225,36 @@ function bjaq_insert_question() {
 function bjaq_admin_page() {
 	global $wpdb;
 
-	$result = mysql_query("SELECT * FROM " . $wpdb->bjaq_questions . "
+	$results = $wpdb->get_results("SELECT * FROM " . $wpdb->bjaq_questions . "
 							WHERE status = 1 ORDER BY submitted DESC");
 	echo('
+        <noscript>You must have Javascript enabled to use this admin</noscript>
 		<div class="wrap">
 			<h2>'.__('Ask A Question - Queue').'</h2>
 			<table cellspacing="3" id="bjaq_admin_table">
 				<tr>
 					<th>ID</th>
 					<th>Date</th>
-					<th>IP/Host</th>
+                    <th>IP <a href="#" title="Hover over IP for host">?</a></th>
 					<th>Question</th>
 					<th>Status</th>
 				</tr>
 	');
 
-	if (mysql_num_rows($result)) {
+	if ($results) {
 		$i = -1;
 
-		while ($kRow = mysql_fetch_array($result)) {
-			echo('<tr id="bjaq-id-' . $kRow['ID'] . '"' . ($i == 1 ? ' class="alt"' : '') . '>
-					<td>' . $kRow['ID'] . '</td>
-					<td>' . $kRow['submitted'] . '</td>
-					<td>' . $kRow['ip'] . ' 
-						<a href="#" title="' . $kRow['host'] . '">?</a>
+		foreach ($results as $result) {
+			echo('<tr id="bjaq-id-' . $result->ID . '"' . ($i == 1 ? ' class="alt"' : '') . '>
+					<td>' . $result->ID . '</td>
+					<td>' . $result->submitted . '</td>
+                    <td><span title="' . $result->host . '">
+                        ' . $result->ip . '
+                    </a>
 					</td>
-					<td>' . $kRow['question'] . '</td>
+					<td>' . $result->question . '</td>
 					<td>
-						<a href="javascript:bjaq_disable_question(' . $kRow['ID'] . ')">Disable</a>
+						<a href="javascript:bjaq_disable_question(' . $result->ID . ')">Delete</a>
 					</td>
 				</tr>
 			');
@@ -354,22 +332,22 @@ function bjaq_ajax_post() {
 
 
 //	This is the request for the AJAX admin actions
-if (@$_REQUEST['bjaq_admin_ajax']) {
+function bjaq_ajax_disable() {
+    global $wpdb;
+    
+    $question_id = get_request_var("bjaq_question_id");
+    if ($question_id) {
 
-	$sResult = 'failed';
-
-	if (@$_REQUEST['bjaq_question_id']) {
-		
-		$result = mysql_query("UPDATE " . $wpdb->bjaq_questions . " SET status = 0
-						WHERE ID = " . $_REQUEST['bjaq_question_id'] . " LIMIT 1");
+        // TODO: Turn into prepare statement
+        $result = $wpdb->query($wpdb->prepare("UPDATE " . $wpdb->bjaq_questions 
+            . " SET status = 0 WHERE ID = %s LIMIT 1", $question_id));
 		
 		if ($result) {
-			$sResult = 'success';
+            die("success");
 		}
 	}
 
-	die("{result: '" . $sResult . "',
-		  category_id: " . $_REQUEST['bjaq_question_id'] . "}");
+	die("failed");
 }
 
 function bjaq_javascript() {
@@ -381,7 +359,6 @@ function bjaq_javascript() {
 
         var params = "?bjaq_action=bjaq_ajax_post&"
              + jQuery("#bjaq-question-textarea").serialize();
-        alert(params);
 
         jQuery.ajax({
             type: "POST",
@@ -448,7 +425,7 @@ function bjaq_javascript() {
 	die();
 }
 
-if (@$_REQUEST['bjaq_css']) {
+function bjaq_css() {
 	header("Content-type: text/css");
 	?>
 	#bjaq-question-textarea {
@@ -500,6 +477,9 @@ function bjaq_controller() {
             break;
         case "bjaq_ajax_post":
             bjaq_ajax_post();
+            break;
+        case "bjaq_ajax_disable":
+            bjaq_ajax_disable();
             break;
     }
 }
