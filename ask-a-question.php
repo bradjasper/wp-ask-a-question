@@ -8,21 +8,23 @@ Version: 0.2
 Author URI: http://www.bradjasper.com
 */
 
-// ini_set("error_reporting", E_ALL);
-
 //	Let's define a few errors we're going to use throughout the script
 $aErrors = array(
-			"flood"	=> "You've reached the maximum limit,"
-						. " please slow down",
-			"request"	=> "There was a problem completing your"
-						. " request, please try again",
-			"empty"	=> "The question you submitted was empty."
-						. " Please fill out the form and try again",
-            "insert_error" => "There was an error while saving your message"
-						. " Please fill out the form and try again",
-            "unknown" => "An unknown error occured. Please try again",
-			"default"	=> "There was an error submitting your"
-						. " question, please try again"
+    "flood"	        => "You've reached the maximum limit, please slow down",
+
+    "unknown"       => "An unknown error occured. Please try again",
+
+    "request"	    => "There was a problem completing your "
+                    . "request, please try again",
+
+    "empty"	        => "The question you submitted was empty."
+                  . "Please fill out the form and try again",
+
+    "insert_error"  => "There was an error while saving your message "
+                  . "Please fill out the form and try again",
+
+    "default"       => "There was an error submitting your"
+                     . " question, please try again"
 );
 
 function bjaq_install() {
@@ -30,13 +32,13 @@ function bjaq_install() {
 
 	//	Create the table
 	$result = mysql_query('CREATE TABLE `' . $wpdb->bjaq_questions .'` (
-					`ID` INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
-					`submitted` DATETIME NOT NULL ,
-					`question` TEXT NOT NULL ,
-					`ip` VARCHAR( 15 ) NOT NULL ,
-					`host` VARCHAR( 255 ) NOT NULL ,
-					`status` INT( 1 ) NOT NULL DEFAULT \'1\'
-					) ENGINE = MYISAM ;') or die('Unable to create table');
+        `ID` INT( 11 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+        `submitted` DATETIME NOT NULL ,
+        `question` TEXT NOT NULL ,
+        `ip` VARCHAR( 15 ) NOT NULL ,
+        `host` VARCHAR( 255 ) NOT NULL ,
+        `status` INT( 1 ) NOT NULL DEFAULT \'1\'
+        ) ENGINE = MYISAM ;') or die('Unable to create table');
 
 	if (!$result) {
 		return false;
@@ -47,13 +49,14 @@ function bjaq_install() {
 }
 
 function bjaq_form_html($action=".") {
-	return '<div id="bjaq-div">
-                <form id="bjaq-form" action="' . $action . '">
-                        <input type="hidden" name="bjaq_action" value="bjaq_post" />
-						<textarea name="bjaq_message" id="bjaq-question-textarea"></textarea>
-						<input type="submit" onclick="bjaq_askQuestion(); return false;" value="Ask" />
-					</form>
-				 </div>';
+    return 
+    '<div id="bjaq-div">
+        <form id="bjaq-form" action="' . $action . '">
+            <input type="hidden" name="bjaq_action" value="bjaq_post" />
+            <textarea name="bjaq_message" id="bjaq-question-textarea"></textarea>
+            <input type="submit" onclick="bjaq_askQuestion(); return false;" value="Ask" />
+        </form>
+     </div>';
 
 }
 
@@ -495,4 +498,5 @@ add_action('admin_head', 'bjaq_admin_head');
 add_action('init', 'bjaq_init');
 add_action('admin_menu', 'bjaq_admin_menu');
 add_action('template_redirect', 'bjaq_controller');
+
 ?>
